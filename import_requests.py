@@ -1,4 +1,3 @@
-import requests
 from bs4 import BeautifulSoup
 import csv
 import tkinter as tk
@@ -6,6 +5,7 @@ from tkinter import simpledialog
 import os
 import re  # Import regular expressions module
 import string  # Import string module for character validation
+import requests
 
 def get_company_info(soup):
     companies = []
@@ -87,7 +87,7 @@ def main():
     # Ask for URL and file name:
     url = simpledialog.askstring("Input", "Please enter the Yellow Pages URL:")
     file_name = simpledialog.askstring("Input", "Please enter the CSV file name (with .csv extension):")
-    
+
     if not url or not file_name:
         print("URL or file name not provided. Exiting.")
         return
@@ -97,15 +97,26 @@ def main():
 
     try:
         response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            print(f"Error: Received status code {response.status_code} from the URL")
+            return
+        
         soup = BeautifulSoup(response.text, 'html.parser')
         total_pages = get_total_pages(soup)
+        
+        if total_pages > 1:
+            print(f"Found {total_pages} pages. Scraping each page...")
 
-        base_url = url.split('&page=')[0] + '&page='
+        base_url = re.sub(r'&page=\d+', '', url)  # Remove any existing page parameter
+        base_url = re.sub(r'page=\d+', '', base_url)  # Remove any existing page parameter if written differently
 
         all_companies = []
         for page in range(1, total_pages + 1):
-            page_url = base_url + str(page)
+            page_url = f"{base_url}&page={page}"
             response = requests.get(page_url, headers=headers)
+            if response.status_code != 200:
+                print(f"Error: Received status code {response.status_code} when trying to fetch page {page}")
+                continue
             soup = BeautifulSoup(response.text, 'html.parser')
             companies = get_company_info(soup)
             all_companies.extend(companies)
